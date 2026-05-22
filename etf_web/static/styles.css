@@ -1,0 +1,470 @@
+:root {
+    --bg: #f4efe7;
+    --panel: #fffdf8;
+    --ink: #1e2a2f;
+    --muted: #66747b;
+    --line: #d8cfc2;
+    --accent: #0b6e4f;
+    --accent-soft: #dff1e8;
+    --shadow: 0 18px 48px rgba(39, 42, 31, 0.08);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--ink);
+    background:
+        radial-gradient(circle at top right, rgba(11, 110, 79, 0.12), transparent 30%),
+        linear-gradient(180deg, #f8f4ec 0%, var(--bg) 100%);
+}
+
+.page {
+    width: min(1220px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 32px 0 48px;
+}
+
+.hero,
+.split,
+.summary-grid,
+.filters,
+.upload-form,
+.sip-form {
+    display: grid;
+    gap: 16px;
+}
+
+.hero,
+.split {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    align-items: start;
+}
+
+.eyebrow,
+.label {
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+h1,
+h2,
+p {
+    margin-top: 0;
+}
+
+h1 {
+    font-size: clamp(2.2rem, 4vw, 4.4rem);
+    margin-bottom: 12px;
+}
+
+.lede {
+    max-width: 62ch;
+    line-height: 1.6;
+    color: #314147;
+}
+
+.panel,
+.source-card,
+.metric {
+    background: var(--panel);
+    border: 1px solid rgba(216, 207, 194, 0.95);
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+}
+
+.panel,
+.source-card {
+    padding: 20px;
+}
+
+.source-card {
+    background: linear-gradient(160deg, var(--accent-soft), #fff8ee);
+}
+
+.upload-form,
+.filters,
+.sip-form {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    align-items: end;
+}
+
+.error {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #fce7df;
+    color: #8f2d12;
+}
+
+label span {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.92rem;
+}
+
+input,
+select,
+button {
+    width: 100%;
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    font: inherit;
+    padding: 10px 12px;
+}
+
+button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.summary-grid {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    margin: 20px 0;
+}
+
+.metric {
+    padding: 18px;
+}
+
+.metric span {
+    display: block;
+    color: var(--muted);
+    margin-bottom: 8px;
+}
+
+.metric strong {
+    font-size: 1.4rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    text-align: left;
+    padding: 12px 10px;
+    border-bottom: 1px solid #ede3d6;
+    vertical-align: top;
+}
+
+th {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+
+.mini-list {
+    display: grid;
+    gap: 12px;
+}
+
+.mini-list div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee2d5;
+}
+
+.table-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.calculator-panel {
+    margin-bottom: 24px;
+}
+
+.calculator-summary {
+    margin-top: 20px;
+}
+
+.calculator-notes {
+    margin: 8px 0 18px;
+    color: #314147;
+}
+
+.calculator-notes p {
+    margin-bottom: 6px;
+}
+
+.comparison-block {
+    margin-top: 20px;
+}
+
+.comparison-chart-wrap {
+    margin-top: 10px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fffaf2;
+    overflow-x: auto;
+}
+
+.comparison-chart-wrap canvas {
+    display: block;
+    width: 100%;
+    min-width: 760px;
+}
+
+.comparison-table {
+    margin-top: 14px;
+}
+
+.stock-chart-panel {
+    margin-bottom: 24px;
+}
+
+.momentum-panel {
+    margin-bottom: 24px;
+}
+
+.strategy-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    min-width: min(560px, 100%);
+}
+
+.year-range-control.hidden {
+    display: none;
+}
+
+.momentum-chart-wrap {
+    position: relative;
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    overflow-x: auto;
+}
+
+.momentum-chart-wrap canvas {
+    display: block;
+    width: 100%;
+    min-width: 820px;
+}
+
+.chart-tooltip {
+    position: absolute;
+    z-index: 10;
+    min-width: 190px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fffdf8;
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.chart-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.chart-tooltip strong,
+.chart-tooltip em {
+    display: block;
+}
+
+.chart-tooltip strong {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 0.94rem;
+    font-style: normal;
+}
+
+.chart-tooltip strong span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 10px;
+}
+
+.chart-tooltip em {
+    margin-top: 3px;
+    color: var(--muted);
+    font-size: 0.86rem;
+    font-style: normal;
+}
+
+.momentum-table-wrap {
+    margin-top: 14px;
+    max-height: 420px;
+    border: 1px solid #ede3d6;
+    border-radius: 12px;
+}
+
+.strategy-line-picker {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fffaf2;
+}
+
+.strategy-line-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+    color: var(--muted);
+}
+
+.strategy-line-picker-header div {
+    display: flex;
+    gap: 8px;
+}
+
+.strategy-line-picker-header button {
+    width: auto;
+    min-height: 34px;
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: #6f4f3b;
+}
+
+.strategy-line-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.strategy-line-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 6px 8px;
+    border: 1px solid #ede3d6;
+    border-radius: 10px;
+    background: var(--panel);
+}
+
+.strategy-line-checkbox input {
+    width: 16px;
+    min-height: 16px;
+    padding: 0;
+}
+
+.strategy-line-checkbox span {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.muted-text {
+    color: var(--muted);
+}
+
+.timeframe-controls {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(78px, 1fr));
+    gap: 8px;
+    min-width: min(420px, 100%);
+}
+
+.timeframe-button {
+    background: #f7efe3;
+    color: var(--ink);
+    border: 1px solid var(--line);
+}
+
+.timeframe-button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+}
+
+.candlestick-chart-wrap {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel);
+    overflow-x: auto;
+}
+
+.candlestick-chart-wrap canvas {
+    display: block;
+    width: 100%;
+    min-width: 760px;
+}
+
+.slab-editor {
+    grid-column: 1 / -1;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.slab-editor-header,
+.slab-grid {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) 110px;
+    align-items: center;
+}
+
+.slab-editor-header {
+    grid-template-columns: 1fr 130px;
+    margin-bottom: 10px;
+}
+
+.slab-editor-header span,
+.slab-grid-heading {
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.slab-row {
+    margin-top: 8px;
+}
+
+.remove-slab {
+    background: #6f4f3b;
+}
+
+@media (max-width: 768px) {
+    .page {
+        width: min(100% - 20px, 1220px);
+    }
+
+    .mini-list div,
+    .table-header {
+        display: block;
+    }
+
+    .slab-editor-header,
+    .slab-grid,
+    .strategy-controls,
+    .strategy-line-picker-header {
+        grid-template-columns: 1fr;
+        display: grid;
+    }
+}

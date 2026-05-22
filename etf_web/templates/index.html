@@ -1,0 +1,1518 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NSE ETF Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <div>
+                <p class="eyebrow">ETF-first NSE instrument workbench</p>
+                <h1>NSE ETF Analyzer</h1>
+                <p class="lede">
+                    Explore ETF coverage, compare costs and returns, and pressure-test funds before expanding the same workflow to stocks and other NSE instruments.
+                </p>
+            </div>
+            <div class="source-card">
+                <span class="label">Current dataset</span>
+                <strong>{{ source_name }}</strong>
+                <p>The bundled CSV is a starter sample. Upload a broader NSE ETF export at any time using the same schema.</p>
+                <p>{{ generation_message }}</p>
+                <p>
+                    <a href="{{ url_for('download_generated', filename=generated_master_name) }}">Download generated ETF master CSV</a><br>
+                    <a href="{{ url_for('download_generated', filename=generated_daily_name) }}">Download generated daily OHLC CSV</a>
+                </p>
+            </div>
+        </section>
+
+        <section class="panel">
+            {% if error_message %}
+                <p class="error">{{ error_message }}</p>
+            {% endif %}
+            <form method="post" enctype="multipart/form-data" class="upload-form">
+                <label>
+                    <span>Upload ETF CSV</span>
+                    <input type="file" name="dataset" accept=".csv">
+                </label>
+                <button type="submit">Load dataset</button>
+            </form>
+
+            <form method="get" class="filters">
+                <label>
+                    <span>Search</span>
+                    <input type="text" name="query" value="{{ filters.query }}" placeholder="Search symbol or fund name">
+                </label>
+                <label>
+                    <span>Category</span>
+                    <select name="category">
+                        <option value="">All categories</option>
+                        {% for item in categories %}
+                            <option value="{{ item }}" {% if filters.category == item %}selected{% endif %}>{{ item }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>Issuer</span>
+                    <select name="issuer">
+                        <option value="">All issuers</option>
+                        {% for item in issuers %}
+                            <option value="{{ item }}" {% if filters.issuer == item %}selected{% endif %}>{{ item }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit">Apply filters</button>
+            </form>
+        </section>
+
+        <section class="summary-grid">
+            <article class="metric"><span>Funds</span><strong>{{ summary.count }}</strong></article>
+            <article class="metric"><span>Total AUM</span><strong>{{ summary.total_aum }}</strong></article>
+            <article class="metric"><span>Avg Expense</span><strong>{{ summary.avg_expense }}</strong></article>
+            <article class="metric"><span>Avg 1Y Return</span><strong>{{ summary.avg_return }}</strong></article>
+            <article class="metric"><span>Avg Score</span><strong>{{ summary.avg_score }}</strong></article>
+        </section>
+
+        <section class="panel momentum-panel">
+            <div class="table-header">
+                <div>
+                    <h2>Nifty Total Market Momentum Comparison</h2>
+                    <p id="momentum-chart-status">Loading strategy comparison.</p>
+                </div>
+                <div class="strategy-controls">
+                    <label>
+                        <span>Top N</span>
+                        <select id="momentum-top-n">
+                            <option value="all">Top 1-10</option>
+                            {% for top_n in range(1, 11) %}
+                                <option value="{{ top_n }}">Top {{ top_n }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        <span>Trailing return</span>
+                        <select id="momentum-lookback">
+                            <option value="all">All lookbacks</option>
+                            <option value="1m">1 month</option>
+                            <option value="3m">3 months</option>
+                            <option value="6m">6 months</option>
+                            <option value="1y">1 year</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Metric</span>
+                        <select id="momentum-metric">
+                            <option value="cagr_pct">CAGR %</option>
+                            <option value="total_return_pct">Total return %</option>
+                            <option value="final_value">Final value</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Range</span>
+                        <select id="momentum-range">
+                            <option value="max">Max</option>
+                            <option value="1m">1 month</option>
+                            <option value="3m">3 months</option>
+                            <option value="6m">6 months</option>
+                            <option value="1y">1 year</option>
+                            <option value="3y">3 years</option>
+                            <option value="5y">5 years</option>
+                            <option value="custom">Custom years</option>
+                        </select>
+                    </label>
+                    <label class="year-range-control hidden" id="momentum-from-year-wrap">
+                        <span>From year</span>
+                        <input type="number" id="momentum-from-year" min="1900" max="2100" step="1" placeholder="2017">
+                    </label>
+                    <label class="year-range-control hidden" id="momentum-to-year-wrap">
+                        <span>To year</span>
+                        <input type="number" id="momentum-to-year" min="1900" max="2100" step="1" placeholder="2026">
+                    </label>
+                </div>
+            </div>
+            <div class="momentum-chart-wrap">
+                <canvas id="momentum-comparison-chart" height="420"></canvas>
+            </div>
+            <div class="table-wrap momentum-table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Lookback</th>
+                        <th>Top N</th>
+                        <th>Final Value</th>
+                        <th>Total Return</th>
+                        <th>CAGR</th>
+                        <th>Trades</th>
+                    </tr>
+                    </thead>
+                    <tbody id="momentum-comparison-body">
+                    <tr><td colspan="6">Loading strategy comparison.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel momentum-panel">
+            <div class="table-header">
+                <div>
+                    <h2>Strategy Growth Curve</h2>
+                    <p id="strategy-line-status">Loading portfolio value history.</p>
+                </div>
+                <div class="strategy-controls">
+                    <label>
+                        <span>Top N</span>
+                        <select id="strategy-line-top-n">
+                            <option value="all">Top 1-10</option>
+                            {% for top_n in range(1, 11) %}
+                                <option value="{{ top_n }}">Top {{ top_n }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        <span>Trailing return</span>
+                        <select id="strategy-line-lookback">
+                            <option value="all">All lookbacks</option>
+                            <option value="1m">1 month</option>
+                            <option value="3m">3 months</option>
+                            <option value="6m">6 months</option>
+                            <option value="1y">1 year</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Metric</span>
+                        <select id="strategy-line-metric">
+                            <option value="portfolio_value">Portfolio value</option>
+                            <option value="return_pct">Return %</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Chart range</span>
+                        <select id="strategy-line-range">
+                            <option value="max">Max</option>
+                            <option value="1m">1 month</option>
+                            <option value="3m">3 months</option>
+                            <option value="6m">6 months</option>
+                            <option value="1y">1 year</option>
+                            <option value="3y">3 years</option>
+                            <option value="5y">5 years</option>
+                            <option value="custom">Custom years</option>
+                        </select>
+                    </label>
+                    <label class="year-range-control hidden" id="strategy-line-from-year-wrap">
+                        <span>From year</span>
+                        <input type="number" id="strategy-line-from-year" min="1900" max="2100" step="1" placeholder="2017">
+                    </label>
+                    <label class="year-range-control hidden" id="strategy-line-to-year-wrap">
+                        <span>To year</span>
+                        <input type="number" id="strategy-line-to-year" min="1900" max="2100" step="1" placeholder="2026">
+                    </label>
+                </div>
+            </div>
+            <div class="momentum-chart-wrap">
+                <canvas id="strategy-growth-chart" height="460"></canvas>
+                <div id="strategy-line-tooltip" class="chart-tooltip" aria-hidden="true"></div>
+            </div>
+            <div class="strategy-line-picker">
+                <div class="strategy-line-picker-header">
+                    <span>Line selection</span>
+                    <div>
+                        <button type="button" id="strategy-line-select-all">Select all</button>
+                        <button type="button" id="strategy-line-clear-all">Clear</button>
+                    </div>
+                </div>
+                <div id="strategy-line-checkboxes" class="strategy-line-checkboxes">
+                    <span class="muted-text">Loading strategy lines.</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel calculator-panel">
+            <div class="table-header">
+                <div>
+                    <h2>{{ selected_sip_symbol or "ETF" }} SIP Calculator</h2>
+                    <p>Uses the selected monthly ETF dataset. Each month's investment is assumed to buy whole units at that month's open price, and the final valuation uses the selected end month's close.</p>
+                </div>
+            </div>
+            {% if sip_error_message %}
+                <p class="error">{{ sip_error_message }}</p>
+            {% endif %}
+            {% if sip_form %}
+                <form method="get" class="sip-form" id="calculator-form">
+                    <label>
+                        <span>ETF</span>
+                        <select name="sip_symbol">
+                            {% for symbol in sip_symbols %}
+                                <option value="{{ symbol }}" {% if selected_sip_symbol == symbol %}selected{% endif %}>{{ symbol }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        <span>Plan type</span>
+                        <select name="sip_mode">
+                            <option value="sip" {% if sip_form.mode == "sip" %}selected{% endif %}>SIP</option>
+                            <option value="step_up_sip" {% if sip_form.mode == "step_up_sip" %}selected{% endif %}>Step-up SIP</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Monthly investment (Rs)</span>
+                        <input type="number" min="1" step="1" name="sip_amount" value="{{ sip_form.monthly_amount }}">
+                    </label>
+                    <label>
+                        <span>Annual step-up (%)</span>
+                        <input type="number" min="0" step="0.5" name="sip_step_up" value="{{ sip_form.annual_step_up_pct }}">
+                    </label>
+                    <label>
+                        <span>Ultra-short return for Excel (%)</span>
+                        <input type="number" min="0" step="0.1" name="sip_debt_return" value="{{ sip_form.debt_annual_return_pct }}">
+                    </label>
+                    <label>
+                        <span>Start month</span>
+                        <select name="sip_start_month">
+                            {% for month in sip_months %}
+                                <option value="{{ month }}" {% if sip_form.start_month == month %}selected{% endif %}>{{ month }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label>
+                        <span>End month</span>
+                        <select name="sip_end_month">
+                            {% for month in sip_months %}
+                                <option value="{{ month }}" {% if sip_form.end_month == month %}selected{% endif %}>{{ month }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <div class="slab-editor">
+                        <div class="slab-editor-header">
+                            <span>Drawdown slabs for Excel</span>
+                            <button type="button" id="add-slab">Add slab</button>
+                        </div>
+                        <div class="slab-grid slab-grid-heading">
+                            <span>Drawdown %</span>
+                            <span>Allocation %</span>
+                            <span></span>
+                        </div>
+                        <div id="slab-rows">
+                            {% for slab in drawdown_slabs %}
+                                <div class="slab-grid slab-row">
+                                    <input type="number" min="0" max="99.999" step="0.1" name="slab_drawdown" value="{{ "%.2f"|format(slab.drawdown_pct) }}">
+                                    <input type="number" min="0" max="100" step="0.1" name="slab_allocation" value="{{ "%.2f"|format(slab.allocation_pct) }}">
+                                    <button type="button" class="remove-slab">Remove</button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <button type="submit" data-form-action="{{ url_for('index') }}">Calculate return</button>
+                    <button type="submit" name="calculate_drawdown_summary" value="1" data-form-action="{{ url_for('index') }}">Calculate drawdown summary</button>
+                    <button type="submit" data-form-action="{{ url_for('download_drawdown_report') }}">Download detailed {{ selected_sip_symbol }} drawdown Excel report</button>
+                </form>
+            {% endif %}
+
+            {% if strategy_comparison %}
+                <div class="comparison-block">
+                    <div class="table-header">
+                        <div>
+                            <h2>Strategy comparison</h2>
+                            <p>Monthly invested amount and portfolio values for the selected ETF range.</p>
+                        </div>
+                    </div>
+                    <div class="comparison-chart-wrap">
+                        <canvas id="strategy-comparison-chart" height="360"></canvas>
+                    </div>
+                    <div class="table-wrap comparison-table">
+                        <table>
+                            <thead>
+                            <tr>
+                                <th>Strategy</th>
+                                <th>Invested</th>
+                                <th>Final Value</th>
+                                <th>Gain / Loss</th>
+                                <th>Absolute Return</th>
+                                <th>XIRR</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in strategy_comparison %}
+                                <tr>
+                                    <td>{{ row.label }}</td>
+                                    <td>Rs {{ "%.2f"|format(row.invested) }}</td>
+                                    <td>Rs {{ "%.2f"|format(row.final_value) }}</td>
+                                    <td>Rs {{ "%.2f"|format(row.gain) }}</td>
+                                    <td>{{ "%.2f"|format(row.absolute_return_pct) }}%</td>
+                                    <td>{% if row.xirr_pct is not none %}{{ "%.2f"|format(row.xirr_pct) }}%{% else %}N/A{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if drawdown_summary %}
+                <div class="summary-grid calculator-summary">
+                    <article class="metric"><span>Drawdown total invested</span><strong>Rs {{ "%.2f"|format(drawdown_summary.total_contributed) }}</strong></article>
+                    <article class="metric"><span>Drawdown total value</span><strong>Rs {{ "%.2f"|format(drawdown_summary.final_value) }}</strong></article>
+                    <article class="metric"><span>Total return</span><strong>{{ "%.2f"|format(drawdown_summary.absolute_return_pct) }}%</strong></article>
+                    <article class="metric"><span>XIRR</span><strong>{% if drawdown_summary.xirr_pct is not none %}{{ "%.2f"|format(drawdown_summary.xirr_pct) }}%{% else %}N/A{% endif %}</strong></article>
+                    <article class="metric"><span>ETF invested</span><strong>Rs {{ "%.2f"|format(drawdown_summary.total_invested) }}</strong></article>
+                    <article class="metric"><span>Ultra-short value</span><strong>Rs {{ "%.2f"|format(drawdown_summary.debt_value) }}</strong></article>
+                    <article class="metric"><span>ETF value</span><strong>Rs {{ "%.2f"|format(drawdown_summary.gold_value) }}</strong></article>
+                    <article class="metric"><span>Total units</span><strong>{{ "%.0f"|format(drawdown_summary.total_units) }}</strong></article>
+                </div>
+                <div class="calculator-notes">
+                    <p><strong>Drawdown range:</strong> {{ drawdown_summary.start_month }} to {{ drawdown_summary.end_month }} ({{ drawdown_summary.months }} price rows)</p>
+                    <p><strong>Total value:</strong> ETF value + ultra-short value. Interest is accrued by calendar-day gaps between available price rows.</p>
+                </div>
+            {% endif %}
+
+            {% if sip_result %}
+                <div class="summary-grid calculator-summary">
+                    <article class="metric"><span>Total invested</span><strong>Rs {{ "%.2f"|format(sip_result.total_invested) }}</strong></article>
+                    <article class="metric"><span>Portfolio value</span><strong>Rs {{ "%.2f"|format(sip_result.final_value) }}</strong></article>
+                    <article class="metric"><span>Gain / Loss</span><strong>Rs {{ "%.2f"|format(sip_result.gain) }}</strong></article>
+                    <article class="metric"><span>Absolute return</span><strong>{{ "%.2f"|format(sip_result.absolute_return_pct) }}%</strong></article>
+                    <article class="metric"><span>XIRR</span><strong>{% if sip_result.xirr_pct is not none %}{{ "%.2f"|format(sip_result.xirr_pct) }}%{% else %}N/A{% endif %}</strong></article>
+                    <article class="metric"><span>Total units</span><strong>{{ "%.0f"|format(sip_result.total_units) }}</strong></article>
+                    <article class="metric"><span>Ending close</span><strong>Rs {{ "%.2f"|format(sip_result.final_close) }}</strong></article>
+                </div>
+
+                <div class="calculator-notes">
+                    <p><strong>Range:</strong> {{ sip_result.start_month }} to {{ sip_result.end_month }} ({{ sip_result.months }} months)</p>
+                    <p><strong>Mode:</strong>
+                        {% if sip_result.mode == "step_up_sip" %}
+                            Step-up SIP, annual step-up {{ "%.2f"|format(sip_result.annual_step_up_pct) }}%
+                        {% else %}
+                            SIP
+                        {% endif %}
+                    </p>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>Month</th>
+                            <th>Investment</th>
+                            <th>Buy Price</th>
+                            <th>Units Bought</th>
+                            <th>Cumulative Units</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in sip_result.schedule %}
+                            <tr>
+                                <td>{{ row.month }}</td>
+                                <td>Rs {{ "%.2f"|format(row.investment) }}</td>
+                                <td>Rs {{ "%.2f"|format(row.buy_price) }}</td>
+                                <td>{{ "%.0f"|format(row.units_bought) }}</td>
+                                <td>{{ "%.0f"|format(row.cumulative_units) }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </section>
+
+        <section class="split">
+            <article class="panel">
+                <h2>Category breakdown</h2>
+                <table>
+                    <thead><tr><th>Category</th><th>Count</th><th>Share</th></tr></thead>
+                    <tbody>
+                    {% for row in category_breakdown %}
+                        <tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ row.share }}</td></tr>
+                    {% else %}
+                        <tr><td colspan="3">No data for current filters.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </article>
+            <article class="panel">
+                <h2>Issuer breakdown</h2>
+                <table>
+                    <thead><tr><th>Issuer</th><th>Count</th><th>Share</th></tr></thead>
+                    <tbody>
+                    {% for row in issuer_breakdown %}
+                        <tr><td>{{ row.label }}</td><td>{{ row.count }}</td><td>{{ row.share }}</td></tr>
+                    {% else %}
+                        <tr><td colspan="3">No data for current filters.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </article>
+        </section>
+
+        <section class="split">
+            <article class="panel">
+                <h2>Best low-cost ETFs</h2>
+                <div class="mini-list">
+                    {% for row in top_expense %}
+                        <div><strong>{{ row.symbol }}</strong><span>{{ row.expense_ratio }} expense ratio</span></div>
+                    {% else %}
+                        <p>No ranked data.</p>
+                    {% endfor %}
+                </div>
+            </article>
+            <article class="panel">
+                <h2>Strongest 1Y returns</h2>
+                <div class="mini-list">
+                    {% for row in top_return %}
+                        <div><strong>{{ row.symbol }}</strong><span>{{ row.one_year_return }} return</span></div>
+                    {% else %}
+                        <p>No ranked data.</p>
+                    {% endfor %}
+                </div>
+            </article>
+            <article class="panel">
+                <h2>Highest composite scores</h2>
+                <div class="mini-list">
+                    {% for row in top_score %}
+                        <div><strong>{{ row.symbol }}</strong><span>{{ row.analysis_score }} score</span></div>
+                    {% else %}
+                        <p>No ranked data.</p>
+                    {% endfor %}
+                </div>
+            </article>
+        </section>
+
+        <section class="panel stock-chart-panel">
+            <div class="table-header">
+                <div>
+                    <h2>RELIANCE Candlestick Chart</h2>
+                    <p id="stock-chart-status">Loading RELIANCE candles.</p>
+                </div>
+                <div class="timeframe-controls" role="group" aria-label="Candlestick timeframe">
+                    <button type="button" class="timeframe-button active" data-timeframe="daily">Daily</button>
+                    <button type="button" class="timeframe-button" data-timeframe="weekly">Weekly</button>
+                    <button type="button" class="timeframe-button" data-timeframe="monthly">Monthly</button>
+                    <button type="button" class="timeframe-button" data-timeframe="yearly">Yearly</button>
+                </div>
+            </div>
+            <div class="candlestick-chart-wrap">
+                <canvas id="reliance-candlestick-chart" height="420"></canvas>
+            </div>
+        </section>
+
+        <section class="panel">
+            <div class="table-header">
+                <div>
+                    <h2>ETF dataset</h2>
+                    <p>Use this table as the base layer for future stock and broader NSE instrument analysis.</p>
+                </div>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Fund</th>
+                        <th>Category</th>
+                        <th>Issuer</th>
+                        <th>AUM</th>
+                        <th>Expense</th>
+                        <th>NAV</th>
+                        <th>Price</th>
+                        <th>1Y Return</th>
+                        <th>3Y Return</th>
+                        <th>Volatility</th>
+                        <th>Tracking Error</th>
+                        <th>Score</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in records %}
+                        <tr>
+                            <td>{{ row.symbol }}</td>
+                            <td>{{ row.fund_name }}</td>
+                            <td>{{ row.category }}</td>
+                            <td>{{ row.issuer }}</td>
+                            <td>{{ row.aum_cr }}</td>
+                            <td>{{ row.expense_ratio }}</td>
+                            <td>{{ row.nav }}</td>
+                            <td>{{ row.close_price }}</td>
+                            <td>{{ row.one_year_return }}</td>
+                            <td>{{ row.three_year_return }}</td>
+                            <td>{{ row.volatility }}</td>
+                            <td>{{ row.tracking_error }}</td>
+                            <td>{{ row.analysis_score }}</td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="13">No ETFs match the current filters.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+    <script>
+        const strategyComparison = {{ (strategy_comparison or [])|tojson }};
+        const strategySeries = {{ (strategy_series or [])|tojson }};
+        const slabRows = document.getElementById("slab-rows");
+        const addSlabButton = document.getElementById("add-slab");
+        const calculatorForm = document.getElementById("calculator-form");
+        const strategyChart = document.getElementById("strategy-comparison-chart");
+        const candleCanvas = document.getElementById("reliance-candlestick-chart");
+        const candleStatus = document.getElementById("stock-chart-status");
+        const timeframeButtons = document.querySelectorAll(".timeframe-button");
+        const momentumCanvas = document.getElementById("momentum-comparison-chart");
+        const momentumStatus = document.getElementById("momentum-chart-status");
+        const momentumTopN = document.getElementById("momentum-top-n");
+        const momentumLookback = document.getElementById("momentum-lookback");
+        const momentumMetric = document.getElementById("momentum-metric");
+        const momentumRange = document.getElementById("momentum-range");
+        const momentumFromYear = document.getElementById("momentum-from-year");
+        const momentumToYear = document.getElementById("momentum-to-year");
+        const momentumFromYearWrap = document.getElementById("momentum-from-year-wrap");
+        const momentumToYearWrap = document.getElementById("momentum-to-year-wrap");
+        const momentumBody = document.getElementById("momentum-comparison-body");
+        let momentumPayload = null;
+        let momentumEquityPayload = null;
+        const strategyLineCanvas = document.getElementById("strategy-growth-chart");
+        const strategyLineStatus = document.getElementById("strategy-line-status");
+        const strategyLineTopN = document.getElementById("strategy-line-top-n");
+        const strategyLineLookback = document.getElementById("strategy-line-lookback");
+        const strategyLineMetric = document.getElementById("strategy-line-metric");
+        const strategyLineRange = document.getElementById("strategy-line-range");
+        const strategyLineFromYear = document.getElementById("strategy-line-from-year");
+        const strategyLineToYear = document.getElementById("strategy-line-to-year");
+        const strategyLineFromYearWrap = document.getElementById("strategy-line-from-year-wrap");
+        const strategyLineToYearWrap = document.getElementById("strategy-line-to-year-wrap");
+        const strategyLineCheckboxes = document.getElementById("strategy-line-checkboxes");
+        const strategyLineSelectAll = document.getElementById("strategy-line-select-all");
+        const strategyLineClearAll = document.getElementById("strategy-line-clear-all");
+        const strategyLineTooltip = document.getElementById("strategy-line-tooltip");
+        let strategyLinePayload = null;
+        let selectedStrategyLineKeys = new Set();
+        let strategyLineHitPoints = [];
+
+        function createSlabRow(drawdown = "", allocation = "") {
+            const row = document.createElement("div");
+            row.className = "slab-grid slab-row";
+            row.innerHTML = `
+                <input type="number" min="0" max="99.999" step="0.1" name="slab_drawdown" value="${drawdown}">
+                <input type="number" min="0" max="100" step="0.1" name="slab_allocation" value="${allocation}">
+                <button type="button" class="remove-slab">Remove</button>
+            `;
+            return row;
+        }
+
+        if (addSlabButton && slabRows) {
+            addSlabButton.addEventListener("click", () => {
+                slabRows.appendChild(createSlabRow());
+            });
+
+            slabRows.addEventListener("click", (event) => {
+                if (event.target.classList.contains("remove-slab")) {
+                    event.target.closest(".slab-row").remove();
+                }
+            });
+        }
+
+        if (calculatorForm) {
+            calculatorForm.addEventListener("submit", (event) => {
+                const submitter = event.submitter;
+                if (submitter && submitter.dataset.formAction) {
+                    calculatorForm.action = submitter.dataset.formAction;
+                }
+            });
+        }
+
+        function formatRupees(value) {
+            return `Rs ${Math.round(value).toLocaleString("en-IN")}`;
+        }
+
+        function escapeHtml(value) {
+            return String(value).replace(/[&<>"']/g, (character) => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;",
+            }[character]));
+        }
+
+        function drawStrategyComparisonChart(canvas, rows) {
+            if (!canvas || !rows.length) {
+                return;
+            }
+
+            const context = canvas.getContext("2d");
+            const ratio = window.devicePixelRatio || 1;
+            const width = canvas.clientWidth;
+            const height = canvas.height;
+            canvas.width = width * ratio;
+            canvas.height = height * ratio;
+            context.scale(ratio, ratio);
+            context.clearRect(0, 0, width, height);
+
+            const padding = { top: 42, right: 20, bottom: 58, left: 92 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            const lineDefs = [
+                { key: "amount_invested", label: "Amount invested", color: "#6f4f3b" },
+                { key: "sip_value", label: "SIP value", color: "#1f77b4" },
+                { key: "step_up_value", label: "Step-up SIP value", color: "#0b6e4f" },
+                { key: "drawdown_value", label: "Drawdown value", color: "#b23b3b" },
+            ];
+            const maxValue = Math.max(...rows.flatMap((row) => lineDefs.map((line) => Number(row[line.key] || 0))));
+            const scaleMax = maxValue * 1.12 || 1;
+
+            context.font = "12px Georgia, 'Times New Roman', serif";
+            context.textBaseline = "middle";
+            context.strokeStyle = "#e7dccf";
+            context.fillStyle = "#66747b";
+            context.lineWidth = 1;
+
+            for (let index = 0; index <= 4; index += 1) {
+                const y = padding.top + chartHeight - (chartHeight * index / 4);
+                const value = scaleMax * index / 4;
+                context.beginPath();
+                context.moveTo(padding.left, y);
+                context.lineTo(width - padding.right, y);
+                context.stroke();
+                context.fillText(formatRupees(value), 8, y);
+            }
+
+            const xForIndex = (index) => {
+                if (rows.length === 1) {
+                    return padding.left + chartWidth / 2;
+                }
+                return padding.left + (chartWidth * index / (rows.length - 1));
+            };
+            const yForValue = (value) => padding.top + chartHeight - (chartHeight * value / scaleMax);
+
+            context.textAlign = "left";
+            lineDefs.forEach((line, index) => {
+                const x = padding.left + index * 150;
+                context.fillStyle = line.color;
+                context.fillRect(x, 14, 12, 12);
+                context.fillStyle = "#1e2a2f";
+                context.fillText(line.label, x + 18, 20);
+            });
+
+            lineDefs.forEach((line) => {
+                context.beginPath();
+                rows.forEach((row, index) => {
+                    const x = xForIndex(index);
+                    const y = yForValue(Number(row[line.key] || 0));
+                    if (index === 0) {
+                        context.moveTo(x, y);
+                    } else {
+                        context.lineTo(x, y);
+                    }
+                });
+                context.strokeStyle = line.color;
+                context.lineWidth = 2.2;
+                context.stroke();
+            });
+
+            const tickIndexes = [0, Math.floor(rows.length / 4), Math.floor(rows.length / 2), Math.floor(rows.length * 3 / 4), rows.length - 1]
+                .filter((value, index, list) => value >= 0 && list.indexOf(value) === index);
+            context.textAlign = "center";
+            context.fillStyle = "#66747b";
+            tickIndexes.forEach((index) => {
+                const x = xForIndex(index);
+                context.fillText(rows[index].month, x, height - 28);
+            });
+
+            const last = rows[rows.length - 1];
+            context.textAlign = "right";
+            context.fillStyle = "#1e2a2f";
+            context.fillText(formatRupees(last.drawdown_value), width - padding.right, padding.top + 10);
+        }
+
+        drawStrategyComparisonChart(strategyChart, strategySeries);
+        window.addEventListener("resize", () => drawStrategyComparisonChart(strategyChart, strategySeries));
+
+        function formatMetricValue(value, metric) {
+            if (metric === "final_value") {
+                return formatRupees(value);
+            }
+            return `${Number(value).toFixed(2)}%`;
+        }
+
+        function parseYearInput(input) {
+            const year = Number(input && input.value);
+            return Number.isInteger(year) && year >= 1900 && year <= 2100 ? year : null;
+        }
+
+        function customYearLabel(fromYear, toYear) {
+            if (fromYear && toYear) {
+                return `${Math.min(fromYear, toYear)} to ${Math.max(fromYear, toYear)}`;
+            }
+            if (fromYear) {
+                return `from ${fromYear}`;
+            }
+            if (toYear) {
+                return `to ${toYear}`;
+            }
+            return "custom years";
+        }
+
+        function updateYearRangeControls(rangeControl, fromWrap, toWrap) {
+            const isCustom = rangeControl && rangeControl.value === "custom";
+            [fromWrap, toWrap].forEach((wrap) => {
+                if (wrap) {
+                    wrap.classList.toggle("hidden", !isCustom);
+                }
+            });
+        }
+
+        function getFilteredMomentumRows() {
+            if (!momentumPayload) {
+                return [];
+            }
+            const selectedTop = momentumTopN.value;
+            const selectedLookback = momentumLookback.value;
+            const selectedRange = momentumRange.value;
+            if (selectedRange !== "max" && momentumEquityPayload) {
+                return getRangeAdjustedMomentumRows(
+                    selectedTop,
+                    selectedLookback,
+                    selectedRange,
+                    parseYearInput(momentumFromYear),
+                    parseYearInput(momentumToYear)
+                );
+            }
+            const rows = [];
+            momentumPayload.lookbacks.forEach((lookback) => {
+                if (selectedLookback !== "all" && lookback.key !== selectedLookback) {
+                    return;
+                }
+                (momentumPayload.series[lookback.key] || []).forEach((row) => {
+                    if (selectedTop !== "all" && Number(row.top_n) !== Number(selectedTop)) {
+                        return;
+                    }
+                    rows.push({ ...row, lookback_key: lookback.key, lookback_label: lookback.label });
+                });
+            });
+            return rows;
+        }
+
+        function getRangeAdjustedMomentumRows(selectedTop, selectedLookback, selectedRange, fromYear, toYear) {
+            const rows = [];
+            momentumEquityPayload.lookbacks.forEach((lookback) => {
+                if (selectedLookback !== "all" && lookback.key !== selectedLookback) {
+                    return;
+                }
+                (momentumEquityPayload.series[lookback.key] || []).forEach((series) => {
+                    if (selectedTop !== "all" && Number(series.top_n) !== Number(selectedTop)) {
+                        return;
+                    }
+                    const ranged = applyStrategyLineRange([series], selectedRange, fromYear, toYear)[0];
+                    if (!ranged || !ranged.points.length) {
+                        return;
+                    }
+                    const firstPoint = ranged.points[0];
+                    const lastPoint = ranged.points[ranged.points.length - 1];
+                    const firstTime = new Date(firstPoint.date).getTime();
+                    const lastTime = new Date(lastPoint.date).getTime();
+                    const years = Math.max((lastTime - firstTime) / (365.25 * 24 * 60 * 60 * 1000), 1 / 365.25);
+                    const finalValue = Number(lastPoint.portfolio_value || 0);
+                    const totalReturnPct = Number(lastPoint.return_pct || 0);
+                    const cagrPct = ((finalValue / 100000) ** (1 / years) - 1) * 100;
+                    rows.push({
+                        top_n: series.top_n,
+                        final_value: Math.round(finalValue * 100) / 100,
+                        total_return_pct: Math.round(totalReturnPct * 100) / 100,
+                        cagr_pct: Math.round(cagrPct * 100) / 100,
+                        trades: null,
+                        ending_holdings: "",
+                        lookback_key: lookback.key,
+                        lookback_label: lookback.label,
+                    });
+                });
+            });
+            return rows;
+        }
+
+        function drawMomentumChart() {
+            if (!momentumCanvas || !momentumStatus || !momentumPayload) {
+                return;
+            }
+            const metric = momentumMetric.value;
+            const selectedTop = momentumTopN.value;
+            const selectedLookback = momentumLookback.value;
+            const selectedRange = momentumRange.value;
+            const rows = getFilteredMomentumRows();
+            const rangeText = selectedRange === "custom"
+                ? customYearLabel(parseYearInput(momentumFromYear), parseYearInput(momentumToYear))
+                : selectedRange;
+            momentumStatus.textContent = rows.length
+                ? `${rows.length} strategy points shown.${selectedRange === "max" ? "" : ` Values are rebased for ${rangeText}.`}`
+                : "No strategy comparison data found for this selection.";
+            renderMomentumTable(rows);
+
+            const context = momentumCanvas.getContext("2d");
+            const ratio = window.devicePixelRatio || 1;
+            const width = momentumCanvas.clientWidth;
+            const height = momentumCanvas.height;
+            momentumCanvas.width = width * ratio;
+            momentumCanvas.height = height * ratio;
+            context.scale(ratio, ratio);
+            context.clearRect(0, 0, width, height);
+            context.fillStyle = "#fffdf8";
+            context.fillRect(0, 0, width, height);
+
+            if (!rows.length) {
+                context.fillStyle = "#66747b";
+                context.font = "14px Georgia, 'Times New Roman', serif";
+                context.textAlign = "center";
+                context.fillText("No strategy comparison data available", width / 2, height / 2);
+                return;
+            }
+
+            if (selectedTop === "all" && selectedLookback !== "all") {
+                drawMomentumGroupedBars(context, width, height, rows, metric, "top_n");
+            } else if (selectedTop !== "all" && selectedLookback === "all") {
+                drawMomentumGroupedBars(context, width, height, rows, metric, "lookback_label");
+            } else {
+                drawMomentumGroupedBars(context, width, height, rows, metric, "combined");
+            }
+        }
+
+        function drawMomentumGroupedBars(context, width, height, rows, metric, labelMode) {
+            const padding = { top: 40, right: 28, bottom: 78, left: 92 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            const values = rows.map((row) => Number(row[metric] || 0));
+            const maxValue = Math.max(...values, metric === "final_value" ? 1 : 0);
+            const minValue = Math.min(...values, 0);
+            const scaleMax = maxValue <= 0 ? 1 : maxValue * 1.12;
+            const scaleMin = minValue >= 0 ? 0 : minValue * 1.12;
+            const scaleRange = Math.max(scaleMax - scaleMin, 1);
+            const palette = {
+                "1m": "#0b6e4f",
+                "3m": "#1f77b4",
+                "6m": "#b7791f",
+                "1y": "#b23b3b",
+            };
+            const yForValue = (value) => padding.top + chartHeight - (chartHeight * (value - scaleMin) / scaleRange);
+            const zeroY = yForValue(0);
+
+            context.font = "12px Georgia, 'Times New Roman', serif";
+            context.textBaseline = "middle";
+            context.strokeStyle = "#e7dccf";
+            context.fillStyle = "#66747b";
+            context.textAlign = "left";
+            for (let index = 0; index <= 4; index += 1) {
+                const y = padding.top + chartHeight - (chartHeight * index / 4);
+                const value = scaleMin + scaleRange * index / 4;
+                context.beginPath();
+                context.moveTo(padding.left, y);
+                context.lineTo(width - padding.right, y);
+                context.stroke();
+                context.fillText(formatMetricValue(value, metric), 8, y);
+            }
+
+            const slot = chartWidth / rows.length;
+            const barWidth = Math.max(8, Math.min(34, slot * 0.58));
+            rows.forEach((row, index) => {
+                const value = Number(row[metric] || 0);
+                const x = padding.left + index * slot + slot / 2 - barWidth / 2;
+                const y = yForValue(value);
+                context.fillStyle = palette[row.lookback_key] || "#6f4f3b";
+                context.fillRect(x, Math.min(y, zeroY), barWidth, Math.max(1, Math.abs(zeroY - y)));
+            });
+
+            context.textAlign = "center";
+            context.textBaseline = "top";
+            context.fillStyle = "#48545a";
+            rows.forEach((row, index) => {
+                if (rows.length > 18 && index % 2 !== 0) {
+                    return;
+                }
+                const x = padding.left + index * slot + slot / 2;
+                const label = labelMode === "top_n"
+                    ? `T${row.top_n}`
+                    : labelMode === "lookback_label"
+                        ? row.lookback_label.replace("Trailing ", "")
+                        : `${row.lookback_key} T${row.top_n}`;
+                context.save();
+                context.translate(x, height - padding.bottom + 12);
+                context.rotate(rows.length > 12 ? -Math.PI / 5 : 0);
+                context.fillText(label, 0, 0);
+                context.restore();
+            });
+
+            const legend = momentumPayload.lookbacks || [];
+            context.textAlign = "left";
+            context.textBaseline = "middle";
+            legend.forEach((lookback, index) => {
+                const x = padding.left + index * 155;
+                context.fillStyle = palette[lookback.key] || "#6f4f3b";
+                context.fillRect(x, 16, 12, 12);
+                context.fillStyle = "#1e2a2f";
+                context.fillText(lookback.label, x + 18, 22);
+            });
+        }
+
+        function renderMomentumTable(rows) {
+            if (!momentumBody) {
+                return;
+            }
+            if (!rows.length) {
+                momentumBody.innerHTML = `<tr><td colspan="6">No strategy comparison data found.</td></tr>`;
+                return;
+            }
+            momentumBody.innerHTML = rows
+                .slice()
+                .sort((a, b) => Number(b[momentumMetric.value]) - Number(a[momentumMetric.value]))
+                .map((row) => `
+                    <tr>
+                        <td>${row.lookback_label}</td>
+                        <td>Top ${row.top_n}</td>
+                        <td>${formatRupees(row.final_value)}</td>
+                        <td>${Number(row.total_return_pct).toFixed(2)}%</td>
+                        <td>${Number(row.cagr_pct).toFixed(2)}%</td>
+                        <td>${row.trades === null ? "-" : Number(row.trades).toLocaleString("en-IN")}</td>
+                    </tr>
+                `)
+                .join("");
+        }
+
+        async function loadMomentumComparison() {
+            if (!momentumCanvas) {
+                return;
+            }
+            try {
+                const [comparisonResponse, equityResponse] = await Promise.all([
+                    fetch("/strategy-comparison-data"),
+                    fetch("/strategy-equity-series"),
+                ]);
+                momentumPayload = await comparisonResponse.json();
+                momentumEquityPayload = await equityResponse.json();
+                drawMomentumChart();
+            } catch (error) {
+                momentumStatus.textContent = "Unable to load strategy comparison data.";
+            }
+        }
+
+        [momentumTopN, momentumLookback, momentumMetric, momentumRange, momentumFromYear, momentumToYear].forEach((control) => {
+            if (control) {
+                control.addEventListener("change", () => {
+                    updateYearRangeControls(momentumRange, momentumFromYearWrap, momentumToYearWrap);
+                    drawMomentumChart();
+                });
+            }
+        });
+        updateYearRangeControls(momentumRange, momentumFromYearWrap, momentumToYearWrap);
+        loadMomentumComparison();
+        window.addEventListener("resize", drawMomentumChart);
+
+        function getFilteredStrategyLines() {
+            if (!strategyLinePayload) {
+                return [];
+            }
+            const selectedTop = strategyLineTopN.value;
+            const selectedLookback = strategyLineLookback.value;
+            const lines = [];
+            strategyLinePayload.lookbacks.forEach((lookback) => {
+                if (selectedLookback !== "all" && lookback.key !== selectedLookback) {
+                    return;
+                }
+                (strategyLinePayload.series[lookback.key] || []).forEach((series) => {
+                    if (selectedTop !== "all" && Number(series.top_n) !== Number(selectedTop)) {
+                        return;
+                    }
+                    lines.push(series);
+                });
+            });
+            return lines.filter((series) => selectedStrategyLineKeys.has(series.key));
+        }
+
+        function getAvailableStrategyLines() {
+            if (!strategyLinePayload) {
+                return [];
+            }
+            const selectedTop = strategyLineTopN.value;
+            const selectedLookback = strategyLineLookback.value;
+            const lines = [];
+            strategyLinePayload.lookbacks.forEach((lookback) => {
+                if (selectedLookback !== "all" && lookback.key !== selectedLookback) {
+                    return;
+                }
+                (strategyLinePayload.series[lookback.key] || []).forEach((series) => {
+                    if (selectedTop !== "all" && Number(series.top_n) !== Number(selectedTop)) {
+                        return;
+                    }
+                    lines.push(series);
+                });
+            });
+            return lines;
+        }
+
+        function renderStrategyLineCheckboxes() {
+            if (!strategyLineCheckboxes || !strategyLinePayload) {
+                return;
+            }
+            const available = getAvailableStrategyLines();
+            if (!available.length) {
+                strategyLineCheckboxes.innerHTML = `<span class="muted-text">No strategy lines found.</span>`;
+                drawStrategyGrowthChart();
+                return;
+            }
+
+            const availableKeys = new Set(available.map((series) => series.key));
+            selectedStrategyLineKeys = new Set([...selectedStrategyLineKeys].filter((key) => availableKeys.has(key)));
+            if (!selectedStrategyLineKeys.size) {
+                available.forEach((series) => selectedStrategyLineKeys.add(series.key));
+            }
+
+            strategyLineCheckboxes.innerHTML = available.map((series) => `
+                <label class="strategy-line-checkbox">
+                    <input type="checkbox" value="${series.key}" ${selectedStrategyLineKeys.has(series.key) ? "checked" : ""}>
+                    <span>${series.lookback_label.replace("Trailing ", "")} Top ${series.top_n}</span>
+                </label>
+            `).join("");
+
+            strategyLineCheckboxes.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+                checkbox.addEventListener("change", () => {
+                    if (checkbox.checked) {
+                        selectedStrategyLineKeys.add(checkbox.value);
+                    } else {
+                        selectedStrategyLineKeys.delete(checkbox.value);
+                    }
+                    drawStrategyGrowthChart();
+                });
+            });
+            drawStrategyGrowthChart();
+        }
+
+        function drawStrategyGrowthChart() {
+            if (!strategyLineCanvas || !strategyLineStatus || !strategyLinePayload) {
+                return;
+            }
+            const lines = getFilteredStrategyLines();
+            const metric = strategyLineMetric.value;
+            const rangeKey = strategyLineRange.value;
+            const fromYear = parseYearInput(strategyLineFromYear);
+            const toYear = parseYearInput(strategyLineToYear);
+            const rangedLines = applyStrategyLineRange(lines, rangeKey, fromYear, toYear);
+            const rangeText = rangeKey === "custom" ? customYearLabel(fromYear, toYear) : rangeKey;
+            strategyLineStatus.textContent = lines.length
+                ? `${lines.length} strategy lines shown.${rangeKey === "max" ? "" : ` Values are rebased for ${rangeText}.`}`
+                : "No portfolio history found for this selection.";
+
+            const context = strategyLineCanvas.getContext("2d");
+            const ratio = window.devicePixelRatio || 1;
+            const width = strategyLineCanvas.clientWidth;
+            const height = strategyLineCanvas.height;
+            strategyLineHitPoints = [];
+            strategyLineCanvas.width = width * ratio;
+            strategyLineCanvas.height = height * ratio;
+            context.scale(ratio, ratio);
+            context.clearRect(0, 0, width, height);
+            context.fillStyle = "#fffdf8";
+            context.fillRect(0, 0, width, height);
+
+            if (!rangedLines.length || !rangedLines.some((line) => line.points.length)) {
+                context.fillStyle = "#66747b";
+                context.font = "14px Georgia, 'Times New Roman', serif";
+                context.textAlign = "center";
+                context.fillText("No portfolio history available", width / 2, height / 2);
+                return;
+            }
+
+            const allPoints = rangedLines.flatMap((line) => line.points || []);
+            const minTime = Math.min(...allPoints.map((point) => new Date(point.date).getTime()));
+            const maxTime = Math.max(...allPoints.map((point) => new Date(point.date).getTime()));
+            const maxValue = Math.max(...allPoints.map((point) => Number(point[metric] || 0)), 1);
+            const minValue = metric === "return_pct"
+                ? Math.min(0, ...allPoints.map((point) => Number(point[metric] || 0)))
+                : 0;
+            const padding = { top: 44, right: 28, bottom: 58, left: 96 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+            const scaleMax = maxValue * 1.08;
+            const scaleMin = minValue;
+            const range = Math.max(scaleMax - scaleMin, 1);
+            const xForDate = (dateText) => {
+                const time = new Date(dateText).getTime();
+                if (maxTime === minTime) {
+                    return padding.left + chartWidth / 2;
+                }
+                return padding.left + ((time - minTime) / (maxTime - minTime)) * chartWidth;
+            };
+            const yForValue = (value) => padding.top + chartHeight - ((value - scaleMin) / range) * chartHeight;
+
+            context.font = "12px Georgia, 'Times New Roman', serif";
+            context.textBaseline = "middle";
+            context.strokeStyle = "#e7dccf";
+            context.fillStyle = "#66747b";
+            context.textAlign = "left";
+            for (let index = 0; index <= 5; index += 1) {
+                const y = padding.top + chartHeight - (chartHeight * index / 5);
+                const value = scaleMin + range * index / 5;
+                context.beginPath();
+                context.moveTo(padding.left, y);
+                context.lineTo(width - padding.right, y);
+                context.stroke();
+                context.fillText(metric === "portfolio_value" ? formatRupees(value) : `${value.toFixed(0)}%`, 8, y);
+            }
+
+            const palette = ["#0b6e4f", "#1f77b4", "#b7791f", "#b23b3b", "#6f4f3b", "#5b6ee1", "#008c99", "#a83279", "#68723f", "#d45500"];
+            rangedLines.forEach((line, lineIndex) => {
+                const color = palette[lineIndex % palette.length];
+                context.beginPath();
+                (line.points || []).forEach((point, pointIndex) => {
+                    const value = Number(point[metric] || 0);
+                    const x = xForDate(point.date);
+                    const y = yForValue(value);
+                    strategyLineHitPoints.push({
+                        x,
+                        y,
+                        color,
+                        date: point.date,
+                        value,
+                        metric,
+                        category: `${line.lookback_label} - Top ${line.top_n}`,
+                    });
+                    if (pointIndex === 0) {
+                        context.moveTo(x, y);
+                    } else {
+                        context.lineTo(x, y);
+                    }
+                });
+                context.strokeStyle = color;
+                context.lineWidth = rangedLines.length > 16 ? 1.2 : 1.8;
+                context.globalAlpha = rangedLines.length > 16 ? 0.72 : 0.9;
+                context.stroke();
+                context.globalAlpha = 1;
+            });
+
+            const startDate = new Date(minTime);
+            const endDate = new Date(maxTime);
+            const yearTicks = [];
+            for (let year = startDate.getFullYear(); year <= endDate.getFullYear(); year += 1) {
+                yearTicks.push(new Date(year, 0, 1));
+            }
+            context.textAlign = "center";
+            context.textBaseline = "top";
+            context.fillStyle = "#66747b";
+            yearTicks.forEach((tick) => {
+                const x = padding.left + ((tick.getTime() - minTime) / (maxTime - minTime)) * chartWidth;
+                if (x >= padding.left && x <= width - padding.right) {
+                    context.fillText(String(tick.getFullYear()), x, height - 38);
+                }
+            });
+
+            const legendLines = rangedLines.slice(0, 10);
+            context.textAlign = "left";
+            context.textBaseline = "middle";
+            legendLines.forEach((line, index) => {
+                const x = padding.left + (index % 5) * 150;
+                const y = 18 + Math.floor(index / 5) * 18;
+                context.fillStyle = palette[index % palette.length];
+                context.fillRect(x, y - 5, 11, 11);
+                context.fillStyle = "#1e2a2f";
+                context.fillText(`${line.lookback_key} T${line.top_n}`, x + 16, y);
+            });
+            if (rangedLines.length > 10) {
+                context.fillStyle = "#66747b";
+                context.fillText(`+${rangedLines.length - 10} more`, padding.left + 750, 18);
+            }
+        }
+
+        function showStrategyLineTooltip(event) {
+            if (!strategyLineCanvas || !strategyLineTooltip || !strategyLineHitPoints.length) {
+                return;
+            }
+            const canvasRect = strategyLineCanvas.getBoundingClientRect();
+            const wrapRect = strategyLineCanvas.parentElement.getBoundingClientRect();
+            const mouseX = event.clientX - canvasRect.left;
+            const mouseY = event.clientY - canvasRect.top;
+            let nearest = null;
+            let nearestDistance = Number.POSITIVE_INFINITY;
+            strategyLineHitPoints.forEach((point) => {
+                const distance = Math.hypot(point.x - mouseX, point.y - mouseY);
+                if (distance < nearestDistance) {
+                    nearest = point;
+                    nearestDistance = distance;
+                }
+            });
+            if (!nearest || nearestDistance > 18) {
+                hideStrategyLineTooltip();
+                return;
+            }
+
+            const metricValue = nearest.metric === "portfolio_value"
+                ? formatRupees(nearest.value)
+                : `${nearest.value.toFixed(2)}%`;
+            strategyLineTooltip.innerHTML = `
+                <strong><span style="background:${nearest.color}"></span>${escapeHtml(nearest.category)}</strong>
+                <em>${escapeHtml(nearest.date)}</em>
+                <em>${metricValue}</em>
+            `;
+            const tooltipWidth = strategyLineTooltip.offsetWidth || 210;
+            const left = Math.min(
+                Math.max(event.clientX - wrapRect.left + 14, 8),
+                Math.max(8, wrapRect.width - tooltipWidth - 8)
+            );
+            const top = Math.max(event.clientY - wrapRect.top - 58, 8);
+            strategyLineTooltip.style.left = `${left}px`;
+            strategyLineTooltip.style.top = `${top}px`;
+            strategyLineTooltip.classList.add("visible");
+            strategyLineTooltip.setAttribute("aria-hidden", "false");
+        }
+
+        function hideStrategyLineTooltip() {
+            if (!strategyLineTooltip) {
+                return;
+            }
+            strategyLineTooltip.classList.remove("visible");
+            strategyLineTooltip.setAttribute("aria-hidden", "true");
+        }
+
+        function applyStrategyLineRange(lines, rangeKey, fromYear = null, toYear = null) {
+            const allTimes = lines.flatMap((line) => (line.points || []).map((point) => new Date(point.date).getTime()));
+            if (!allTimes.length) {
+                return [];
+            }
+            const earliestTime = Math.min(...allTimes);
+            const latestTime = Math.max(...allTimes);
+            const latest = new Date(latestTime);
+            let startTime = Number.NEGATIVE_INFINITY;
+            let endTime = Number.POSITIVE_INFINITY;
+            if (rangeKey === "custom") {
+                const normalizedFrom = fromYear && toYear ? Math.min(fromYear, toYear) : fromYear;
+                const normalizedTo = fromYear && toYear ? Math.max(fromYear, toYear) : toYear;
+                startTime = normalizedFrom ? new Date(normalizedFrom, 0, 1).getTime() : earliestTime;
+                endTime = normalizedTo ? new Date(normalizedTo, 11, 31, 23, 59, 59, 999).getTime() : latestTime;
+            } else if (rangeKey !== "max") {
+                startTime = rangeStartTime(latest, rangeKey);
+            }
+            return lines
+                .map((line) => ({
+                    ...line,
+                    points: rebaseStrategyPoints(
+                        (line.points || []).filter((point) => {
+                            const time = new Date(point.date).getTime();
+                            return time >= startTime && time <= endTime;
+                        }),
+                        rangeKey
+                    ),
+                }))
+                .filter((line) => line.points.length);
+        }
+
+        function rangeStartTime(latest, rangeKey) {
+            const start = new Date(latest);
+            if (rangeKey === "1m") {
+                start.setMonth(start.getMonth() - 1);
+            } else if (rangeKey === "3m") {
+                start.setMonth(start.getMonth() - 3);
+            } else if (rangeKey === "6m") {
+                start.setMonth(start.getMonth() - 6);
+            } else if (rangeKey === "1y") {
+                start.setFullYear(start.getFullYear() - 1);
+            } else if (rangeKey === "3y") {
+                start.setFullYear(start.getFullYear() - 3);
+            } else if (rangeKey === "5y") {
+                start.setFullYear(start.getFullYear() - 5);
+            }
+            return start.getTime();
+        }
+
+        function rebaseStrategyPoints(points, rangeKey) {
+            if (!points.length || rangeKey === "max") {
+                return points;
+            }
+            const baseValue = Number(points[0].portfolio_value || 0);
+            if (baseValue <= 0) {
+                return points;
+            }
+            return points.map((point) => {
+                const rebasedValue = Number(point.portfolio_value || 0) / baseValue * 100000;
+                return {
+                    ...point,
+                    portfolio_value: rebasedValue,
+                    return_pct: (rebasedValue / 100000 - 1) * 100,
+                };
+            });
+        }
+
+        async function loadStrategyEquitySeries() {
+            if (!strategyLineCanvas) {
+                return;
+            }
+            try {
+                const response = await fetch("/strategy-equity-series");
+                strategyLinePayload = await response.json();
+                Object.values(strategyLinePayload.series || {}).flat().forEach((series) => {
+                    selectedStrategyLineKeys.add(series.key);
+                });
+                renderStrategyLineCheckboxes();
+            } catch (error) {
+                strategyLineStatus.textContent = "Unable to load portfolio history.";
+            }
+        }
+
+        [strategyLineTopN, strategyLineLookback].forEach((control) => {
+            if (control) {
+                control.addEventListener("change", renderStrategyLineCheckboxes);
+            }
+        });
+        [strategyLineMetric, strategyLineRange, strategyLineFromYear, strategyLineToYear].forEach((control) => {
+            if (control) {
+                control.addEventListener("change", () => {
+                    updateYearRangeControls(strategyLineRange, strategyLineFromYearWrap, strategyLineToYearWrap);
+                    drawStrategyGrowthChart();
+                });
+            }
+        });
+        updateYearRangeControls(strategyLineRange, strategyLineFromYearWrap, strategyLineToYearWrap);
+        if (strategyLineSelectAll) {
+            strategyLineSelectAll.addEventListener("click", () => {
+                getAvailableStrategyLines().forEach((series) => selectedStrategyLineKeys.add(series.key));
+                renderStrategyLineCheckboxes();
+            });
+        }
+        if (strategyLineClearAll) {
+            strategyLineClearAll.addEventListener("click", () => {
+                selectedStrategyLineKeys.clear();
+                if (strategyLineCheckboxes) {
+                    strategyLineCheckboxes.querySelectorAll("input[type='checkbox']").forEach((checkbox) => {
+                        checkbox.checked = false;
+                    });
+                }
+                drawStrategyGrowthChart();
+            });
+        }
+        if (strategyLineCanvas) {
+            strategyLineCanvas.addEventListener("mousemove", showStrategyLineTooltip);
+            strategyLineCanvas.addEventListener("mouseleave", hideStrategyLineTooltip);
+        }
+        loadStrategyEquitySeries();
+        window.addEventListener("resize", drawStrategyGrowthChart);
+
+        async function loadRelianceCandles(timeframe) {
+            if (!candleCanvas || !candleStatus) {
+                return;
+            }
+            candleStatus.textContent = `Loading RELIANCE ${timeframe} candles.`;
+            try {
+                const response = await fetch(`/stock-candles?symbol=RELIANCE&timeframe=${encodeURIComponent(timeframe)}`);
+                const payload = await response.json();
+                if (!payload.candles || !payload.candles.length) {
+                    candleStatus.textContent = "No RELIANCE candle data found. Load adjusted prices or bhavcopy prices first.";
+                    drawCandlestickChart(candleCanvas, []);
+                    return;
+                }
+                candleStatus.textContent = `${payload.symbol} ${timeframe} candles: ${payload.candles.length} bars`;
+                drawCandlestickChart(candleCanvas, payload.candles);
+            } catch (error) {
+                candleStatus.textContent = "Unable to load RELIANCE candle data.";
+                drawCandlestickChart(candleCanvas, []);
+            }
+        }
+
+        function drawCandlestickChart(canvas, candles) {
+            const context = canvas.getContext("2d");
+            const ratio = window.devicePixelRatio || 1;
+            const width = canvas.clientWidth;
+            const height = canvas.height;
+            canvas.width = width * ratio;
+            canvas.height = height * ratio;
+            context.scale(ratio, ratio);
+            context.clearRect(0, 0, width, height);
+
+            const padding = { top: 28, right: 76, bottom: 48, left: 18 };
+            const chartWidth = width - padding.left - padding.right;
+            const chartHeight = height - padding.top - padding.bottom;
+
+            context.fillStyle = "#fffdf8";
+            context.fillRect(0, 0, width, height);
+
+            if (!candles.length) {
+                context.fillStyle = "#66747b";
+                context.font = "14px Georgia, 'Times New Roman', serif";
+                context.textAlign = "center";
+                context.fillText("No candle data available", width / 2, height / 2);
+                return;
+            }
+
+            const minPrice = Math.min(...candles.map((candle) => Number(candle.low)));
+            const maxPrice = Math.max(...candles.map((candle) => Number(candle.high)));
+            const priceRange = Math.max(maxPrice - minPrice, 1);
+            const scaleMin = minPrice - priceRange * 0.06;
+            const scaleMax = maxPrice + priceRange * 0.06;
+            const scaledRange = scaleMax - scaleMin;
+            const slot = chartWidth / candles.length;
+            const candleWidth = Math.max(3, Math.min(14, slot * 0.62));
+            const yForPrice = (price) => padding.top + chartHeight - ((price - scaleMin) / scaledRange) * chartHeight;
+
+            context.strokeStyle = "#ede3d6";
+            context.fillStyle = "#66747b";
+            context.font = "12px Georgia, 'Times New Roman', serif";
+            context.textAlign = "left";
+            context.textBaseline = "middle";
+            for (let index = 0; index <= 4; index += 1) {
+                const price = scaleMin + (scaledRange * index / 4);
+                const y = yForPrice(price);
+                context.beginPath();
+                context.moveTo(padding.left, y);
+                context.lineTo(width - padding.right, y);
+                context.stroke();
+                context.fillText(price.toFixed(2), width - padding.right + 10, y);
+            }
+
+            candles.forEach((candle, index) => {
+                const open = Number(candle.open);
+                const high = Number(candle.high);
+                const low = Number(candle.low);
+                const close = Number(candle.close);
+                const x = padding.left + slot * index + slot / 2;
+                const up = close >= open;
+                const color = up ? "#0b6e4f" : "#b23b3b";
+                const yOpen = yForPrice(open);
+                const yClose = yForPrice(close);
+                const yHigh = yForPrice(high);
+                const yLow = yForPrice(low);
+                const bodyTop = Math.min(yOpen, yClose);
+                const bodyHeight = Math.max(Math.abs(yClose - yOpen), 1);
+
+                context.strokeStyle = color;
+                context.fillStyle = color;
+                context.beginPath();
+                context.moveTo(x, yHigh);
+                context.lineTo(x, yLow);
+                context.stroke();
+                context.fillRect(x - candleWidth / 2, bodyTop, candleWidth, bodyHeight);
+            });
+
+            const tickIndexes = [0, Math.floor(candles.length / 4), Math.floor(candles.length / 2), Math.floor(candles.length * 3 / 4), candles.length - 1]
+                .filter((value, index, list) => value >= 0 && list.indexOf(value) === index);
+            context.fillStyle = "#66747b";
+            context.textAlign = "center";
+            context.textBaseline = "top";
+            tickIndexes.forEach((index) => {
+                const x = padding.left + slot * index + slot / 2;
+                context.fillText(candles[index].date, x, height - 32);
+            });
+
+            const last = candles[candles.length - 1];
+            context.textAlign = "right";
+            context.textBaseline = "top";
+            context.fillStyle = "#1e2a2f";
+            context.fillText(`Close ${Number(last.close).toFixed(2)}`, width - padding.right, 8);
+        }
+
+        timeframeButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+                timeframeButtons.forEach((item) => item.classList.remove("active"));
+                button.classList.add("active");
+                loadRelianceCandles(button.dataset.timeframe);
+            });
+        });
+
+        loadRelianceCandles("daily");
+        window.addEventListener("resize", () => {
+            const active = document.querySelector(".timeframe-button.active");
+            loadRelianceCandles(active ? active.dataset.timeframe : "daily");
+        });
+    </script>
+</body>
+</html>

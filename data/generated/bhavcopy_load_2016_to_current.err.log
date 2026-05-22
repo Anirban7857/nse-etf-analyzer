@@ -1,0 +1,45 @@
+Traceback (most recent call last):
+  File "C:\Users\ANIRBAN\Projects\Python Projects\NSE Instruments web\scripts\download_bhavcopy_to_postgres.py", line 408, in <module>
+    main()
+  File "C:\Users\ANIRBAN\Projects\Python Projects\NSE Instruments web\scripts\download_bhavcopy_to_postgres.py", line 109, in main
+    result = download_bhavcopy(client, trade_date, raw_dir, force=args.force)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\Projects\Python Projects\NSE Instruments web\scripts\download_bhavcopy_to_postgres.py", line 221, in download_bhavcopy
+    status_code, content = client.get(url, timeout=30)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\Projects\Python Projects\NSE Instruments web\scripts\download_bhavcopy_to_postgres.py", line 73, in get
+    with self.opener.open(request, timeout=timeout) as response:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\urllib\request.py", line 519, in open
+    response = self._open(req, data)
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\urllib\request.py", line 536, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\urllib\request.py", line 496, in _call_chain
+    result = func(*args)
+             ^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\urllib\request.py", line 1391, in https_open
+    return self.do_open(http.client.HTTPSConnection, req,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\urllib\request.py", line 1352, in do_open
+    r = h.getresponse()
+        ^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\http\client.py", line 1386, in getresponse
+    response.begin()
+  File "C:\Users\ANIRBAN\anaconda3\Lib\http\client.py", line 325, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\http\client.py", line 286, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\ssl.py", line 1315, in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ANIRBAN\anaconda3\Lib\ssl.py", line 1167, in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TimeoutError: The read operation timed out
