@@ -2,6 +2,8 @@
 title: NSE ETF Analyzer
 sdk: docker
 app_port: 7860
+license: mit
+short_description: Analysis of NSE ETF and strategy data
 ---
 
 # NSE ETF Analyzer
@@ -156,3 +158,4 @@ The loader normalizes common column aliases. The canonical columns are:
 - `tracking_error`
 
 You can upload a CSV with these columns or common alternatives such as `ticker`, `scheme_name`, `amc`, `1y_return`, `ltp`, or `ter`.
+
